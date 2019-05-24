@@ -1,0 +1,17 @@
+# ...other that
+!.gitignore
+
+.idea
+.vscode
+
+# ignore dependency directories
+node_modules
+
+# ignore logs
+*.log
+
+# ignore dumps
+dump
+
+dist
+npm-debug.log
