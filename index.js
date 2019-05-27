@@ -217,14 +217,17 @@ function createDirectoryContents(templatePath, newProjectPath) {
     const stats = fs.statSync(origFilePath);
 
     if (stats.isFile()) {
-      const contents = fs.readFileSync(origFilePath, 'utf8');
       const writePath = `${CURR_DIR}/${newProjectPath}/${file}`;
-
-      fs.writeFileSync(writePath, contents, 'utf8');
+      copyFile(origFilePath, writePath);
     } else if (stats.isDirectory()) {
       fs.mkdirSync(`${CURR_DIR}/${newProjectPath}/${file}`);
 
       createDirectoryContents(`${templatePath}/${file}`, `${newProjectPath}/${file}`);
     }
   });
+}
+
+function copyFile(pathToFile, destPath) {
+  const contents = fs.readFileSync(pathToFile, 'utf8');
+  fs.writeFileSync(destPath, contents, 'utf8');
 }
