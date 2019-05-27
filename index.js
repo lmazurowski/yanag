@@ -9,6 +9,7 @@ const fs = require('fs');
 const os = require('os');
 const chalk = require('chalk');
 const R = require('ramda');
+const semver = require('semver');
 
 const configuration = require('./templates/configuration');
 const commonFiles = require('./templates/commonFiles');
@@ -40,7 +41,7 @@ try {
         if (fs.existsSync(`${CURR_DIR}/${input}`)) {
           return 'Directory already exists. Please, put another name.'
         }
-        if (/^([A-Za-z\-\_\d])+$/.test(input)) return true;
+        if (/^([A-Za-z\-_\d])+$/.test(input)) return true;
         else return 'Project name may only include letters, numbers, underscores and hashes.';
       }
     },
@@ -50,7 +51,7 @@ try {
       message: 'Project root dir:',
       default: 'src',
       validate: function (input) {
-        if (/^([A-Za-z\-\_\d])+$/.test(input)) return true;
+        if (/^([A-Za-z\-_\d])+$/.test(input)) return true;
         else return 'Project root may only include letters, numbers, underscores and hashes.';
       }
     }
@@ -127,13 +128,21 @@ function installDependencies(rootDir, dependencies = [], asDev = false) {
       args.push('--cwd');
       args.push(rootDir);
     } else {
-      command = 'npm';
-      args = [
-        'install',
-        asDev ? '--save-dev' : '--save',
-        '--loglevel',
-        'error',
-      ].concat(dependencies);
+      const npmVersion = getNpmVersion();
+      if (semver.gte(npmVersion, '6.0.1')) {
+        command = 'npm';
+        args = [
+          'install',
+          asDev ? '--save-dev' : '--save',
+          '--loglevel',
+          'error',
+        ].concat(dependencies);
+        args.push('--prefix');
+        args.push(rootDir);
+      } else {
+        log(chalk.red(`The min npm version for this lib is 6.0.1, currently installed in Your system: ${npmVersion}`));
+        process.exit(1);
+      }
     }
 
     const child = spawn(command, args, { stdio: 'inherit' });
@@ -156,6 +165,18 @@ function isYarnEnable() {
   } catch (e) {
     return false;
   }
+}
+
+function getNpmVersion() {
+  let npmVersion = null;
+  try {
+    npmVersion = execSync('npm --version')
+        .toString()
+        .trim();
+  } catch (err) {
+
+  }
+  return npmVersion;
 }
 
 function prepareProjectStructure(rootDir, srcDir, appName, projectType) {
