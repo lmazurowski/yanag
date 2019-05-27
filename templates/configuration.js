@@ -8,7 +8,7 @@ module.exports = {
         name: 'MongoDB',
         dependencies: [
           '@types/mongodb',
-          'mongodb '
+          'mongodb'
         ]
       },
       {
