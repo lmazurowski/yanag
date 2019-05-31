@@ -1,20 +1,20 @@
 #!/usr/bin/env node
 
 'use strict';
-const execSync = require('child_process').execSync;
+
 const inquirer = require('inquirer');
 const spawn = require('cross-spawn');
-const path = require('path');
 const fs = require('fs');
-const os = require('os');
 const chalk = require('chalk');
 const R = require('ramda');
 const semver = require('semver');
 
 const configuration = require('./templates/configuration');
 const commonFiles = require('./templates/commonFiles');
+const utils = require('./common/utils');
 
-const log = console.log;
+const { getNpmVersion, isYarnEnable, writeFile, copyFile, log } = utils;
+
 const CURR_DIR = process.cwd();
 
 try {
@@ -85,34 +85,48 @@ try {
 
       log(chalk.blue('Installing project dependencies...'));
 
-     installDependencies(rootDir, dependencies).then(() => {
-        log(chalk.blue('Installing project devDependencies...'));
+      installDependencies(rootDir, dependencies).then(() => {
+          log(chalk.blue('Installing project devDependencies...'));
           installDependencies(rootDir, devDependencies, true).then(() => {
             log(chalk.green('Project has been created'));
             process.exit(0);
           })
             .catch((reason) => {
-              log(chalk.red(`Error while installing devDependencies, reason: ${reason.command}`));
-              process.exit(1);
+              handleError(chalk.red('Error while installing devDependencies, reason:'), reason.command);
             });
         }
       ).catch((reason) => {
-        log(chalk.red(`Error while installing dependencies, reason: ${reason.command}`));
-        process.exit(1);
+        handleError(chalk.red('Error while installing dependencies, reason: '), reason.command);
       });
-    });
+    }).catch((reason) => {
+    handleError(chalk.red('Error while user prompting, reason: '), reason);
+  });
 
-} catch (error) {
-  log(chalk.red('Error while project creating:'));
-  console.error(error);
+} catch (err) {
+  handleError(chalk.red('Error while project creating:'), err.toString());
+}
+
+function handleError(...args) {
+  log(args);
   process.exit(1);
 }
 
-function writeFile(rootDir, fileName, content) {
-  fs.writeFileSync(
-    path.join(rootDir, fileName),
-    JSON.stringify(content, null, 2) + os.EOL
-  );
+function createDirectoryContents(templatePath, newProjectPath) {
+  const filesToCreate = fs.readdirSync(templatePath);
+
+  filesToCreate.forEach(file => {
+    const origFilePath = `${templatePath}/${file}`;
+    const stats = fs.statSync(origFilePath);
+
+    if (stats.isFile()) {
+      const writePath = `${CURR_DIR}/${newProjectPath}/${file}`;
+      copyFile(origFilePath, writePath);
+    } else if (stats.isDirectory()) {
+      fs.mkdirSync(`${CURR_DIR}/${newProjectPath}/${file}`);
+
+      createDirectoryContents(`${templatePath}/${file}`, `${newProjectPath}/${file}`);
+    }
+  });
 }
 
 function installDependencies(rootDir, dependencies = [], asDev = false) {
@@ -158,27 +172,6 @@ function installDependencies(rootDir, dependencies = [], asDev = false) {
   })
 }
 
-function isYarnEnable() {
-  try {
-    execSync('yarnpkg --version', { stdio: 'ignore' });
-    return true;
-  } catch (e) {
-    return false;
-  }
-}
-
-function getNpmVersion() {
-  let npmVersion = null;
-  try {
-    npmVersion = execSync('npm --version')
-        .toString()
-        .trim();
-  } catch (err) {
-
-  }
-  return npmVersion;
-}
-
 function prepareProjectStructure(rootDir, srcDir, appName, projectType) {
   const templatePath = `${__dirname}/templates/${projectType}`;
 
@@ -207,27 +200,4 @@ function prepareProjectStructure(rootDir, srcDir, appName, projectType) {
   });
 
   createDirectoryContents(templatePath, `${appName}/${srcDir}`);
-}
-
-function createDirectoryContents(templatePath, newProjectPath) {
-  const filesToCreate = fs.readdirSync(templatePath);
-
-  filesToCreate.forEach(file => {
-    const origFilePath = `${templatePath}/${file}`;
-    const stats = fs.statSync(origFilePath);
-
-    if (stats.isFile()) {
-      const writePath = `${CURR_DIR}/${newProjectPath}/${file}`;
-      copyFile(origFilePath, writePath);
-    } else if (stats.isDirectory()) {
-      fs.mkdirSync(`${CURR_DIR}/${newProjectPath}/${file}`);
-
-      createDirectoryContents(`${templatePath}/${file}`, `${newProjectPath}/${file}`);
-    }
-  });
-}
-
-function copyFile(pathToFile, destPath) {
-  const contents = fs.readFileSync(pathToFile, 'utf8');
-  fs.writeFileSync(destPath, contents, 'utf8');
 }
